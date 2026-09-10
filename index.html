@@ -319,7 +319,7 @@
         <button data-val="on">LORDO PAREGGIATO</button>
       </div>
     </div>
-    <p class="note" style="margin-top:0;">"Netto pareggiato" (default): l'utile netto societario è ripartito in modo che il <strong>netto finale risulti identico</strong> per tutti e tre, qualunque sia il loro regime — la quota lorda di ciascuno si adatta di conseguenza, quindi cambiare regime o toggle Inarcassa su un canale sposta anche le quote (e quindi le tasse pagate) degli altri due, non il netto. "Lordo pareggiato": la quota lorda è invece divisa in parti uguali tra i tre; il netto di ciascuno riflette <strong>solo la propria situazione</strong> — cambiare regime o toggle su un canale cambia solo il netto di quel canale, indipendente dagli altri due.</p>
+    <p class="note" style="margin-top:0;">"Netto pareggiato" (default): la quota lorda è ripartita in base al <strong>regime</strong> di ciascuno (assumendo il contributo fisso Inarcassa attivo per tutti come riferimento comune), così che il netto risulti identico quando tutti i toggle sono ON. Il toggle Inarcassa di un canale è invece una situazione <strong>personale</strong> ("l'ho già versato altrove") e aggiusta <strong>solo il netto di quel canale</strong>, senza toccare gli altri due — cambiare regime invece sì, perché è una scelta strutturale che il pareggiamento ridistribuisce. "Lordo pareggiato": la quota lorda è divisa in parti uguali tra i tre; qui ogni canale è completamente indipendente dagli altri, sia per regime sia per toggle.</p>
 
     <div class="channels">
       <div class="channel-card mazz">
@@ -682,7 +682,10 @@
   }
 
   function equalize(utileNetto){
-    var rf = CHANNELS.map(function(k){ return rfFor(regimeSel[k].value, chState[k].inarcassaOn); });
+    // Ripartizione "strutturale": basata solo sul regime di ciascun canale, assumendo la quota fissa
+    // Inarcassa sempre ON come riferimento comune. Il toggle Inarcassa di un canale NON deve influenzare
+    // quanto lordo ricevono gli altri due — agisce solo sul netto del proprio canale, dopo questo calcolo.
+    var rf = CHANNELS.map(function(k){ return rfFor(regimeSel[k].value, true); });
     for(var i=0;i<rf.length;i++){ if(rf[i].r >= 1) return null; }
     var denom = rf.reduce(function(s,x){ return s + 1/(1-x.r); }, 0);
     var numerator = utileNetto - rf.reduce(function(s,x){ return s + x.f/(1-x.r); }, 0);
