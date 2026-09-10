@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HYPER FUZZ — Ripartizione netta soci</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#050507; --bg-panel:#0c0c12; --grid-line:#1c1c26; --ink:#c8f9d8; --ink-dim:#6f8f7c; --cyan:#26ffe6; --magenta:#ff2e9a; --amber:#ffd23f; --danger:#ff4d5e; --border:#2c2c3a; }
+  :root:not([data-theme="light"]){ --bg:#050507; --bg-panel:#0c0c12; --grid-line:#1c1c26; --ink:#c8f9d8; --ink-dim:#6f8f7c; --cyan:#26ffe6; --magenta:#ff2e9a; --amber:#ffd23f; --danger:#ff4d5e; --border:#2c2c3a; }
+  :root[data-theme="dark"]{ --bg:#050507; --bg-panel:#0c0c12; --grid-line:#1c1c26; --ink:#c8f9d8; --ink-dim:#6f8f7c; --cyan:#26ffe6; --magenta:#ff2e9a; --amber:#ffd23f; --danger:#ff4d5e; --border:#2c2c3a; }
+  @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --bg:#050507; --bg-panel:#0c0c12; --grid-line:#1c1c26; --ink:#c8f9d8; --ink-dim:#6f8f7c; --cyan:#26ffe6; --magenta:#ff2e9a; --amber:#ffd23f; --danger:#ff4d5e; --border:#2c2c3a; } }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{ background:var(--bg); color:var(--ink); font-family:'VT323', ui-monospace, monospace; font-size:19px; line-height:1.5; min-height:100vh; position:relative; overflow-x:hidden; }
+
+  .crt{ position:fixed; inset:0; pointer-events:none; z-index:50;
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,0.28) 0px, rgba(0,0,0,0.28) 1px, transparent 2px, transparent 3px),
+      radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%);
+    mix-blend-mode:multiply; }
+  .noise{ position:fixed; inset:-50px; pointer-events:none; z-index:49; opacity:0.05;
+    background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+    animation: noiseShift 0.4s steps(2) infinite; }
+  @keyframes noiseShift{ 0%{transform:translate(0,0);} 50%{transform:translate(-8px,4px);} 100%{transform:translate(6px,-3px);} }
+
+  .wrap{ max-width:980px; margin:0 auto; padding:36px 18px 80px; position:relative; z-index:1; }
+
+  header{ text-align:center; padding:18px 0 30px; }
+  .eyebrow{ color:var(--ink-dim); letter-spacing:2px; font-size:15px; margin-bottom:10px; }
+  h1{ font-family:'Press Start 2P', monospace; font-size:clamp(28px, 6vw, 52px); margin:0; color:var(--ink);
+    position:relative; display:inline-block; text-shadow: 3px 0 var(--magenta), -3px 0 var(--cyan); animation: glitchJitter 4.5s infinite; }
+  h1::before, h1::after{ content:"HYPER FUZZ"; position:absolute; left:0; top:0; width:100%; overflow:hidden; }
+  h1::before{ color:var(--magenta); animation: glitchTop 3.6s infinite linear; clip-path: inset(0 0 60% 0); transform:translate(-2px,-1px); }
+  h1::after{ color:var(--cyan); animation: glitchBottom 3.1s infinite linear; clip-path: inset(60% 0 0 0); transform:translate(2px,1px); }
+  @keyframes glitchJitter{ 0%,92%,100%{ transform:translate(0,0); } 93%{ transform:translate(-2px,1px);} 94%{ transform:translate(2px,-1px);} 95%{ transform:translate(-1px,0);} 96%{ transform:translate(0,0);} }
+  @keyframes glitchTop{ 0%,89%,100%{ clip-path: inset(0 0 60% 0); transform:translate(-2px,-1px);} 90%{ clip-path: inset(10% 0 40% 0); transform:translate(3px,-2px);} 91%{ clip-path: inset(0 0 70% 0); transform:translate(-4px,0);} }
+  @keyframes glitchBottom{ 0%,88%,100%{ clip-path: inset(60% 0 0 0); transform:translate(2px,1px);} 89%{ clip-path: inset(30% 0 10% 0); transform:translate(-3px,2px);} 90%{ clip-path: inset(70% 0 0 0); transform:translate(4px,0);} }
+  .subtitle{ color:var(--ink-dim); margin-top:14px; font-size:18px; }
+
+  .panel{ background:var(--bg-panel); border:2px solid var(--border);
+    box-shadow: 4px 0 0 0 var(--border), -4px 0 0 0 var(--border), 0 4px 0 0 var(--border), 0 -4px 0 0 var(--border);
+    margin-bottom:28px; padding:22px; position:relative; }
+  .panel h2{ font-family:'Press Start 2P', monospace; font-size:14px; color:var(--amber); margin:0 0 16px; letter-spacing:1px; }
+  .panel h3{ font-family:'Press Start 2P', monospace; font-size:11px; color:var(--cyan); margin:22px 0 10px; }
+  .panel h3:first-of-type{ margin-top:0; }
+
+  .row{ display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; margin-bottom:12px; }
+  .field{ display:flex; flex-direction:column; gap:6px; flex:1; min-width:160px; }
+  .field label{ font-size:16px; color:var(--ink-dim); }
+  .field .hint{ font-size:12px; color:var(--ink-dim); opacity:0.7; margin-top:-2px; }
+  input[type="number"], input[type="text"], select{
+    background:#050507; border:2px solid var(--border); color:var(--ink);
+    font-family:'VT323', monospace; font-size:19px; padding:8px 10px; outline-offset:2px; width:100%; }
+  input[type="number"]:focus, input[type="text"]:focus, select:focus{ outline:2px solid var(--cyan); border-color:var(--cyan); }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button{ opacity:0.6; }
+  select{ cursor:pointer; }
+
+  .slider-wrap{ position:relative; padding-top:16px; flex:1; min-width:0; }
+  .slider-wrap input[type="range"]{ width:100%; display:block; }
+  .slider-row{ display:flex; align-items:center; gap:12px; }
+  .slider-row input[type="number"]{ width:130px; flex:none; }
+  input[type="range"]{ -webkit-appearance:none; appearance:none; flex:1; height:20px; background:transparent; cursor:pointer; }
+  input[type="range"]::-webkit-slider-runnable-track{ height:6px; background:var(--grid-line); border:1px solid var(--border); }
+  input[type="range"]::-webkit-slider-thumb{ -webkit-appearance:none; width:16px; height:16px; background:var(--cyan); border:2px solid #04211d; margin-top:-6px; }
+  input[type="range"]::-moz-range-track{ height:6px; background:var(--grid-line); border:1px solid var(--border); }
+  input[type="range"]::-moz-range-thumb{ width:16px; height:16px; background:var(--cyan); border:2px solid #04211d; border-radius:0; }
+  input[type="range"]:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+  .soglia-marker{ position:absolute; top:8px; width:2px; height:20px; display:none; pointer-events:none; }
+  .soglia-marker.soft{ background:var(--amber); }
+  .soglia-marker.hard{ background:var(--danger); }
+  .soglia-marker.soft::after{ content:"⚑"; position:absolute; top:-15px; left:-7px; font-size:13px; color:var(--amber); }
+  .soglia-marker.hard::after{ content:"⚑"; position:absolute; top:-15px; left:-7px; font-size:13px; color:var(--danger); }
+  .slider-caption{ font-size:13px; color:var(--ink-dim); margin-top:6px; }
+
+  button{ font-family:'VT323', monospace; font-size:17px; letter-spacing:0.5px; background:#0f0f16; color:var(--ink); border:2px solid var(--border); padding:9px 16px; cursor:pointer; position:relative; }
+  button:hover{ border-color:var(--cyan); color:var(--cyan); }
+  button:focus-visible{ outline:2px solid var(--cyan); outline-offset:2px; }
+  button.primary{ border-color:var(--cyan); color:var(--cyan); }
+  button.primary:hover{ background:var(--cyan); color:#04211d; }
+  button.danger{ border-color:var(--danger); color:var(--danger); }
+  button.danger:hover{ background:var(--danger); color:#210404; }
+  button.ghost{ border-color:transparent; color:var(--ink-dim); padding:6px 8px; font-size:14px; }
+  button.ghost:hover{ color:var(--magenta); border-color:var(--magenta); }
+  button.small{ padding:5px 10px; font-size:14px; }
+
+  .toggle-group{ display:flex; gap:0; border:2px solid var(--border); width:fit-content; }
+  .toggle-group button{ border:none; }
+  .toggle-group button.active{ background:var(--cyan); color:#04211d; }
+  .toggle-group.magenta button.active{ background:var(--magenta); color:#210418; }
+  .toggle-group.amber button.active{ background:var(--amber); color:#2b2200; }
+  .toggle-group.mini button{ padding:5px 10px; font-size:13px; }
+
+  .expense-row{ display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+  .expense-row input[type="text"]{ flex:1 1 160px; }
+  .expense-row .exp-amt-wrap{ display:flex; align-items:center; gap:10px; flex:2 1 260px; }
+  .expense-row .exp-amt-wrap input[type="number"]{ width:120px; flex:none; }
+  .expense-row .exp-amt-wrap input[type="range"]{ flex:1; }
+
+  .divider{ height:2px; background:var(--grid-line); margin:20px 0; }
+
+  .flow{ display:flex; flex-direction:column; gap:2px; margin-bottom:6px; }
+  .flow-line{ display:flex; justify-content:space-between; padding:9px 4px; border-bottom:1px dashed var(--grid-line); font-size:18px; }
+  .flow-line span:first-child{ color:var(--ink-dim); }
+  .flow-line.total{ font-size:21px; color:var(--ink); }
+  .flow-line.neg span:last-child{ color:var(--danger); }
+  .flow-line.big{ font-family:'Press Start 2P', monospace; font-size:clamp(16px,3vw,22px); padding:16px 4px; color:var(--amber); border-bottom:none; }
+
+  .panel-head{ display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:8px; }
+  .panel-head h2{ margin:0; }
+
+  /* ---- compact collapsible fiscal config ---- */
+  .regime-block{ border:1px solid var(--border); margin-bottom:10px; background:#08080c; }
+  .regime-block summary{ cursor:pointer; padding:10px 12px; font-family:'Press Start 2P', monospace; font-size:11px; color:var(--cyan);
+    list-style:none; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+  .regime-block summary::-webkit-details-marker{ display:none; }
+  .regime-block summary::after{ content:"▸"; color:var(--ink-dim); transition:transform 0.15s; font-family:'VT323',monospace; font-size:18px; }
+  .regime-block[open] summary::after{ transform:rotate(90deg); }
+  .regime-block summary .summary-vals{ font-family:'VT323', monospace; font-size:14px; color:var(--ink-dim); font-weight:normal; text-align:right; flex:1; }
+  .regime-block .regime-body{ padding:4px 12px 12px; }
+  .compact-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(150px,1fr)); gap:10px 14px; }
+  .compact-grid .field{ min-width:0; }
+  .compact-grid .field label{ font-size:14px; }
+  .corp-row{ display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .corp-row .field{ max-width:160px; }
+
+  .channels{ display:flex; gap:16px; flex-wrap:wrap; align-items:stretch; }
+  .channel-card{ flex:1; min-width:250px; background:#08080c; border:2px solid var(--border); padding:18px; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .channel-card.mazz{ border-color:var(--cyan); }
+  .channel-card.pane{ border-color:var(--amber); }
+  .channel-card.zi{ border-color:var(--magenta); }
+  .channel-name{ font-family:'Press Start 2P', monospace; font-size:16px; margin-bottom:10px; }
+  .channel-card.mazz .channel-name{ color:var(--cyan); }
+  .channel-card.pane .channel-name{ color:var(--amber); }
+  .channel-card.zi .channel-name{ color:var(--magenta); }
+  .channel-card select{ font-size:15px; padding:6px 8px; margin-bottom:10px; }
+  .inarcassa-toggle-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px; }
+  .inarcassa-toggle-row span{ font-size:13px; color:var(--ink-dim); }
+  .channel-line{ display:flex; justify-content:space-between; font-size:15px; padding:4px 0; color:var(--ink-dim); }
+  .channel-net{ font-family:'Press Start 2P', monospace; font-size:clamp(17px,3.2vw,24px); margin-top:auto; padding-top:12px; border-top:1px dashed var(--grid-line); }
+  .channel-card.mazz .channel-net{ color:var(--cyan); }
+  .channel-card.pane .channel-net{ color:var(--amber); }
+  .channel-card.zi .channel-net{ color:var(--magenta); }
+  .channel-warn{ font-size:13px; margin-top:8px; display:none; }
+  .channel-warn.soft{ color:var(--amber); }
+  .channel-warn.hard{ color:var(--danger); }
+
+  .note{ color:var(--ink-dim); font-size:14px; margin-top:14px; line-height:1.6; }
+  .warn-box{ border:1px solid var(--danger); color:var(--danger); padding:10px 12px; font-size:14px; margin-top:12px; }
+
+  .templates-bar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+  .templates-bar select{ flex:1; min-width:180px; }
+  .save-row{ display:flex; gap:10px; margin-top:12px; flex-wrap:wrap; }
+  .save-row input{ flex:1; min-width:160px; }
+  .status-msg{ font-size:14px; color:var(--cyan); min-height:20px; margin-top:8px; }
+
+  .scen-table-wrap{ overflow-x:auto; }
+  .scen-table{ width:100%; border-collapse:collapse; margin-top:10px; font-size:15px; min-width:640px; }
+  .scen-table th, .scen-table td{ text-align:left; padding:8px 10px; border-bottom:1px solid var(--grid-line); white-space:nowrap; }
+  .scen-table th{ color:var(--ink-dim); font-size:13px; font-weight:normal; }
+  .scen-table td.name{ color:var(--amber); }
+  .scen-empty{ color:var(--ink-dim); font-size:14px; padding:14px 4px; }
+
+  footer{ text-align:center; color:var(--ink-dim); font-size:13px; padding-top:20px; }
+
+  @media (prefers-reduced-motion: reduce){ h1, h1::before, h1::after, .noise{ animation:none !important; } }
+</style>
+</head>
+<body>
+<div class="crt"></div>
+<div class="noise"></div>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">FUZZ ATELIER // SIMULATORE COMPENSI</div>
+    <h1>HYPER FUZZ</h1>
+    <div class="subtitle">quanto resta davvero a Mazz, Pane e Zi — al netto di tasse societarie e personali</div>
+  </header>
+
+  <section class="panel">
+    <h2>◆ TEMPLATE &amp; CONFIGURAZIONI</h2>
+    <p class="note" style="margin-top:-6px;">Salva la configurazione attiva (input, aliquote, regimi) per riprenderla in un secondo momento.</p>
+    <div class="templates-bar">
+      <select id="templateSelect"><option value="">— seleziona un template salvato —</option></select>
+      <button id="loadTemplateBtn">CARICA</button>
+      <button id="deleteTemplateBtn" class="danger">ELIMINA</button>
+    </div>
+    <div class="save-row">
+      <input type="text" id="templateName" placeholder="nome nuovo template (es. Preventivo 2026)">
+      <button id="saveTemplateBtn" class="primary">SALVA CONFIGURAZIONE ATTUALE</button>
+    </div>
+    <div class="status-msg" id="statusMsg"></div>
+  </section>
+
+  <section class="panel">
+    <h2>◆ CONFIGURAZIONE FISCALE</h2>
+    <p class="note" style="margin-top:-6px;">Parametri verificati su fonti ufficiali (Inarcassa, Agenzia Entrate, Legge di Bilancio 2026) dove possibile — vedi i dettagli in ogni riquadro. Aliquote IRPEF/dipendente restano stime medie editabili: non esiste un'aliquota unica per legge, dipendono dagli scaglioni.</p>
+
+    <div class="corp-row">
+      <div class="field"><label for="ires">IRES società (%)</label><input type="number" id="ires" value="24" step="0.1"></div>
+      <div class="field"><label for="irap">IRAP società (%)</label><input type="number" id="irap" value="3.9" step="0.1"></div>
+    </div>
+
+    <details class="regime-block" id="block-dipendente">
+      <summary>Dipendente (contratto) <span class="summary-vals" id="sum-dipendente"></span></summary>
+      <div class="regime-body">
+        <div class="compact-grid">
+          <div class="field"><label for="impFissa">Tassazione fissa (€)</label><input type="number" id="impFissa" value="0" step="10"></div>
+          <div class="field"><label for="impPct">Tassazione variabile (%)</label><input type="number" id="impPct" value="27" step="0.1"></div>
+          <div class="field"><label for="inpsFissa">INPS fissa (€)</label><input type="number" id="inpsFissa" value="0" step="10"></div>
+          <div class="field"><label for="inpsPct">INPS variabile (%)</label><input type="number" id="inpsPct" value="9.19" step="0.01"></div>
+        </div>
+        <p class="hint" style="margin-top:8px;">Stima media IRPEF+addizionali; l'INPS è dedotta dal reddito imponibile prima di calcolare l'imposta, come nella busta paga reale.</p>
+      </div>
+    </details>
+
+    <details class="regime-block" id="block-forfettario">
+      <summary>Forfettario (autonomo) <span class="summary-vals" id="sum-forfettario"></span></summary>
+      <div class="regime-body">
+        <div class="compact-grid">
+          <div class="field"><label for="coefficiente">Coeff. redditività (%)</label><input type="number" id="coefficiente" value="78" step="1"></div>
+          <div class="field"><label for="aliquotaF15">Sostitutiva standard (%)</label><input type="number" id="aliquotaF15" value="15" step="0.1"></div>
+          <div class="field"><label for="aliquotaF5">Sostitutiva start-up (%)</label><input type="number" id="aliquotaF5" value="5" step="0.1"></div>
+          <div class="field"><label for="sogliaForfettario">Soglia — resta fino a fine anno (€)</label><input type="number" id="sogliaForfettario" value="85000" step="1000"></div>
+          <div class="field"><label for="sogliaForfettarioUscita">Soglia — uscita immediata (€)</label><input type="number" id="sogliaForfettarioUscita" value="100000" step="1000"></div>
+        </div>
+        <p class="hint" style="margin-top:8px;">78% = coefficiente per architetti/ingegneri (ATECO 71.11.00 e affini). Tra 85.000€ e 100.000€: si resta forfettari per l'anno in corso, si esce dal successivo. Oltre 100.000€: uscita immediata nello stesso anno con IVA e tassazione ordinaria (Legge di Bilancio 2026, art. 1 c. 27). I contributi Inarcassa sono dedotti dal reddito forfettario prima dell'imposta sostitutiva.</p>
+      </div>
+    </details>
+
+    <details class="regime-block" id="block-ordinario">
+      <summary>Ordinario (autonomo) <span class="summary-vals" id="sum-ordinario"></span></summary>
+      <div class="regime-body">
+        <div class="compact-grid">
+          <div class="field"><label for="ordFissa">Tassazione fissa (€)</label><input type="number" id="ordFissa" value="0" step="10"></div>
+          <div class="field"><label for="ordPct">Tassazione variabile (%)</label><input type="number" id="ordPct" value="35" step="0.1"></div>
+        </div>
+        <p class="hint" style="margin-top:8px;">Stima media IRPEF a scaglioni + addizionali; l'Inarcassa è dedotta dal reddito prima dell'imposta.</p>
+      </div>
+    </details>
+
+    <details class="regime-block" id="block-inarcassa">
+      <summary>Inarcassa (per posizioni autonome) <span class="summary-vals" id="sum-inarcassa"></span></summary>
+      <div class="regime-body">
+        <div class="compact-grid">
+          <div class="field"><label for="inarcassaFissa">Contributo minimo fisso (€)</label><input type="number" id="inarcassaFissa" value="2850.5" step="0.5"></div>
+          <div class="field"><label for="inarcassaPct">Contributo soggettivo (%)</label><input type="number" id="inarcassaPct" value="14.5" step="0.1"></div>
+        </div>
+        <p class="hint" style="margin-top:8px;">Dati 2026 da inarcassa.it: €2.785 contributo soggettivo minimo + €65,50 maternità/paternità = €2.850,50; aliquota 14,5% fino a €145.550 di reddito. Il contributo integrativo (4%, minimo €850) è escluso: di norma è riaddebitato in fattura al cliente, quindi neutro per il socio.</p>
+      </div>
+    </details>
+
+    <details class="regime-block" id="block-dividendo">
+      <summary>Dividendo (distribuzione utili) <span class="summary-vals" id="sum-dividendo"></span></summary>
+      <div class="regime-body">
+        <div class="compact-grid">
+          <div class="field"><label for="aliquotaDividendo">Imposta sostitutiva (%)</label><input type="number" id="aliquotaDividendo" value="26" step="0.1"></div>
+        </div>
+        <p class="hint" style="margin-top:8px;">Flat sul dividendo lordo, nessun INPS/Inarcassa. Si applica solo sull'utile già tassato in azienda e, salvo diversa previsione nell'atto costitutivo, segue le quote di partecipazione.</p>
+      </div>
+    </details>
+  </section>
+
+  <section class="panel">
+    <h2>◆ ENTRATE E SPESE</h2>
+    <div class="field">
+      <label for="entrate">Entrate totali annuali (€)</label>
+      <div class="slider-row">
+        <input type="number" id="entrate" value="300000" min="0" step="100">
+        <div class="slider-wrap">
+          <div class="soglia-marker soft" id="entrateSogliaMarkerSoft" title=""></div>
+          <div class="soglia-marker hard" id="entrateSogliaMarkerHard" title=""></div>
+          <input type="range" id="entrateSlider" min="0" max="1000000" step="1000" value="300000">
+        </div>
+      </div>
+      <div class="slider-caption" id="sliderCaption">⚑ giallo = soglia forfettario 85.000€ (resti nel regime fino a fine anno); ⚑ rosso = soglia 100.000€ (uscita immediata). Si ricalcolano in tempo reale in base a spese, regimi e modalità di ripartizione attuali.</div>
+    </div>
+
+    <h3>Spese societarie</h3>
+    <div class="toggle-group" id="speseToggle">
+      <button data-mode="single" class="active">IMPORTO UNICO</button>
+      <button data-mode="multi">VOCI MULTIPLE</button>
+    </div>
+
+    <div id="speseSingleWrap" class="field" style="margin-top:14px;">
+      <label for="speseSingle">Totale spese (€)</label>
+      <div class="slider-row">
+        <input type="number" id="speseSingle" value="60000" min="0" step="100">
+        <input type="range" id="speseSingleSlider" min="0" max="500000" step="500" value="60000">
+      </div>
+    </div>
+
+    <div id="speseMultiWrap" style="display:none; margin-top:14px;">
+      <div id="expenseRows"></div>
+      <button id="addExpenseBtn">+ AGGIUNGI VOCE DI SPESA</button>
+      <div class="flow-line total" style="margin-top:12px;"><span>Totale spese</span><span id="speseMultiTotal">€ 0</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>◆ FLUSSO SOCIETARIO</h2>
+    <div class="flow">
+      <div class="flow-line"><span>Entrate totali</span><span id="r_entrate">€ 0</span></div>
+      <div class="flow-line neg"><span>− Spese societarie</span><span id="r_spese">€ 0</span></div>
+      <div class="flow-line total"><span>= Guadagno lordo</span><span id="r_guadagnoLordo">€ 0</span></div>
+      <div class="flow-line neg"><span>− Tasse società (IRES + IRAP)</span><span id="r_taxSocieta">€ 0</span></div>
+      <div class="flow-line big"><span>UTILE NETTO SOCIETARIO</span><span id="r_utileNetto">€ 0</span></div>
+      <div class="flow-line"><span id="quotaLabel">÷ 3 canali (quota paritaria)</span><span id="r_quota">€ 0</span></div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head">
+      <h2>◆ NETTO PER CANALE</h2>
+      <div class="toggle-group magenta" id="pareggiaToggle">
+        <button data-val="off" class="active">NETTO PAREGGIATO</button>
+        <button data-val="on">LORDO PAREGGIATO</button>
+      </div>
+    </div>
+    <p class="note" style="margin-top:0;">"Netto pareggiato" (default): l'utile netto societario è ripartito in modo che il <strong>netto finale risulti identico</strong> per tutti e tre, qualunque sia il loro regime — la quota lorda di ciascuno si adatta di conseguenza, quindi cambiare regime o toggle Inarcassa su un canale sposta anche le quote (e quindi le tasse pagate) degli altri due, non il netto. "Lordo pareggiato": la quota lorda è invece divisa in parti uguali tra i tre; il netto di ciascuno riflette <strong>solo la propria situazione</strong> — cambiare regime o toggle su un canale cambia solo il netto di quel canale, indipendente dagli altri due.</p>
+
+    <div class="channels">
+      <div class="channel-card mazz">
+        <div class="channel-name">MAZZ</div>
+        <select id="mazz_regime">
+          <option value="dipendente">Dipendente (contratto)</option>
+          <option value="forfettario15">Forfettario 15%</option>
+          <option value="forfettario5">Forfettario 5% (start-up)</option>
+          <option value="ordinario">Ordinario</option>
+          <option value="dividendo">Dividendo (distribuzione utili)</option>
+        </select>
+        <div class="inarcassa-toggle-row" id="mazz_inarcassaRow">
+          <span>Quota fissa Inarcassa</span>
+          <div class="toggle-group amber mini" id="mazz_inarcassaToggle"><button data-val="on" class="active">ON</button><button data-val="off">OFF</button></div>
+        </div>
+        <div class="channel-line"><span>Quota lorda</span><span id="mazz_quota">€ 0</span></div>
+        <div class="channel-line"><span id="mazz_tax1label">− Tassazione</span><span id="mazz_tax1">€ 0</span></div>
+        <div class="channel-line"><span id="mazz_tax2label">− Contributi</span><span id="mazz_tax2">€ 0</span></div>
+        <div class="channel-net" id="mazz_net">€ 0</div>
+        <div class="channel-warn" id="mazz_warn"></div>
+      </div>
+
+      <div class="channel-card pane">
+        <div class="channel-name">PANE</div>
+        <select id="pane_regime">
+          <option value="dipendente">Dipendente (contratto)</option>
+          <option value="forfettario15" selected>Forfettario 15%</option>
+          <option value="forfettario5">Forfettario 5% (start-up)</option>
+          <option value="ordinario">Ordinario</option>
+          <option value="dividendo">Dividendo (distribuzione utili)</option>
+        </select>
+        <div class="inarcassa-toggle-row" id="pane_inarcassaRow">
+          <span>Quota fissa Inarcassa</span>
+          <div class="toggle-group amber mini" id="pane_inarcassaToggle"><button data-val="on" class="active">ON</button><button data-val="off">OFF</button></div>
+        </div>
+        <div class="channel-line"><span>Quota lorda</span><span id="pane_quota">€ 0</span></div>
+        <div class="channel-line"><span id="pane_tax1label">− Tassazione</span><span id="pane_tax1">€ 0</span></div>
+        <div class="channel-line"><span id="pane_tax2label">− Contributi</span><span id="pane_tax2">€ 0</span></div>
+        <div class="channel-net" id="pane_net">€ 0</div>
+        <div class="channel-warn" id="pane_warn"></div>
+      </div>
+
+      <div class="channel-card zi">
+        <div class="channel-name">ZI</div>
+        <select id="zi_regime">
+          <option value="dipendente">Dipendente (contratto)</option>
+          <option value="forfettario15" selected>Forfettario 15%</option>
+          <option value="forfettario5">Forfettario 5% (start-up)</option>
+          <option value="ordinario">Ordinario</option>
+          <option value="dividendo">Dividendo (distribuzione utili)</option>
+        </select>
+        <div class="inarcassa-toggle-row" id="zi_inarcassaRow">
+          <span>Quota fissa Inarcassa</span>
+          <div class="toggle-group amber mini" id="zi_inarcassaToggle"><button data-val="on" class="active">ON</button><button data-val="off">OFF</button></div>
+        </div>
+        <div class="channel-line"><span>Quota lorda</span><span id="zi_quota">€ 0</span></div>
+        <div class="channel-line"><span id="zi_tax1label">− Tassazione</span><span id="zi_tax1">€ 0</span></div>
+        <div class="channel-line"><span id="zi_tax2label">− Contributi</span><span id="zi_tax2">€ 0</span></div>
+        <div class="channel-net" id="zi_net">€ 0</div>
+        <div class="channel-warn" id="zi_warn"></div>
+      </div>
+    </div>
+
+    <p class="note">La quota fissa Inarcassa si applica solo alle posizioni autonome; disattivala per un canale se quel socio non versa il contributo minimo. La percentuale variabile resta sempre applicata quando la posizione è autonoma.</p>
+    <div class="warn-box" id="pareggiaWarn" style="display:none;"></div>
+  </section>
+
+  <section class="panel">
+    <h2>◆ ALTERNATIVA: DIVIDENDI INVECE DI FATTURE</h2>
+    <p class="note" style="margin-top:-6px;">In Italia gli utili di una S.r.l. possono uscire dalla società verso i soci anche <strong>senza</strong> passare da fatture o compensi professionali individuali: come <strong>dividendo</strong>, cioè distribuzione diretta dell'utile ai soci in quanto tali.</p>
+    <p class="note">Il dividendo sconta un'imposta sostitutiva flat del 26% e basta — niente scaglioni IRPEF, niente INPS, niente Inarcassa. Tre cose però da tenere a mente:</p>
+    <p class="note">1) si distribuisce solo l'utile <em>già tassato in azienda</em> (dopo IRES+IRAP), quindi parte dallo stesso "Utile netto societario" calcolato sopra;<br>
+    2) prima di distribuire va accantonata la riserva legale (5% dell'utile ogni anno, fino al 20% del capitale sociale);<br>
+    3) di norma la distribuzione segue le quote di partecipazione al capitale — per dividerla in modo diverso da come sono divise le quote societarie serve una previsione specifica nell'atto costitutivo (quote con diritti patrimoniali differenziati, art. 2468 c.c.), non una scelta libera anno per anno come per i compensi.</p>
+    <p class="note">"Dividendo" è selezionabile come regime per ciascun canale qui sopra: prova a metterne uno o tutti e tre e confrontalo con dipendente/forfettario/ordinario usando il pareggiamento e il confronto scenari qui sotto.</p>
+  </section>
+
+  <section class="panel">
+    <h2>◆ CONFRONTO SCENARI</h2>
+    <p class="note" style="margin-top:-6px;">Prova combinazioni diverse di regimi e input, poi congela ogni prova qui sotto per confrontarle fianco a fianco. Ogni riga è uno scatto salvato dei dati e dei netti risultanti.</p>
+    <div class="save-row">
+      <input type="text" id="scenarioName" placeholder="nome dello scenario (es. Tutti forfettario)">
+      <button id="saveScenarioBtn" class="primary">CONGELA SCENARIO CORRENTE</button>
+    </div>
+    <div class="scen-table-wrap">
+      <table class="scen-table" id="scenTable">
+        <thead>
+          <tr><th>Scenario</th><th>Entrate</th><th>Spese</th><th>Mazz</th><th>Pane</th><th>Zi</th><th>Netto Mazz</th><th>Netto Pane</th><th>Netto Zi</th><th>Totale netto</th><th></th></tr>
+        </thead>
+        <tbody id="scenTableBody"></tbody>
+      </table>
+      <div class="scen-empty" id="scenEmpty">Nessuno scenario congelato ancora — prova una combinazione e salvala per iniziare il confronto.</div>
+    </div>
+  </section>
+
+  <footer>HYPER FUZZ — salvataggio locale nel browser, nessun dato lascia questo dispositivo.</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var STORE_KEY = "hyperfuzz_templates_v4";
+  var CURRENT_KEY = "hyperfuzz_current_v4";
+  var SCEN_KEY = "hyperfuzz_scenarios_v4";
+  var fmt = new Intl.NumberFormat('it-IT', { style:'currency', currency:'EUR', maximumFractionDigits:0 });
+  var CHANNELS = ['mazz','pane','zi'];
+  var REGIME_LABEL = { dipendente:'Dipendente', forfettario15:'Forfettario 15%', forfettario5:'Forfettario 5%', ordinario:'Ordinario', dividendo:'Dividendo' };
+
+  var speseMode = 'single';
+  var expenseItems = [];
+  var expenseSeq = 0;
+  var pareggia = false;
+  var chState = {};
+  CHANNELS.forEach(function(k){ chState[k] = { inarcassaOn: true }; });
+
+  var els = {};
+  ["entrate","speseSingle","ires","irap","impFissa","impPct","inpsFissa","inpsPct",
+   "coefficiente","aliquotaF15","aliquotaF5","sogliaForfettario","sogliaForfettarioUscita","ordFissa","ordPct",
+   "inarcassaFissa","inarcassaPct","aliquotaDividendo"].forEach(function(id){ els[id] = document.getElementById(id); });
+
+  var regimeSel = {}; CHANNELS.forEach(function(k){ regimeSel[k] = document.getElementById(k+'_regime'); });
+
+  function safeNum(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
+
+  function currentConfig(){
+    var cfg = { speseMode: speseMode, pareggia: pareggia,
+      expenseItems: expenseItems.map(function(x){ return {nome:x.nome, importo:x.importo}; }) };
+    Object.keys(els).forEach(function(id){ cfg[id] = els[id].value; });
+    CHANNELS.forEach(function(k){ cfg[k+'_regime'] = regimeSel[k].value; cfg[k+'_inarcassaOn'] = chState[k].inarcassaOn; });
+    return cfg;
+  }
+
+  function applyConfig(cfg){
+    if(!cfg) return;
+    Object.keys(els).forEach(function(id){ if(cfg[id] !== undefined) els[id].value = cfg[id]; });
+    speseMode = cfg.speseMode === 'multi' ? 'multi' : 'single';
+    pareggia = !!cfg.pareggia;
+    CHANNELS.forEach(function(k){
+      if(cfg[k+'_regime']) regimeSel[k].value = cfg[k+'_regime'];
+      chState[k].inarcassaOn = cfg[k+'_inarcassaOn'] !== undefined ? !!cfg[k+'_inarcassaOn'] : true;
+    });
+    expenseItems = []; expenseSeq = 0;
+    if(Array.isArray(cfg.expenseItems)){
+      cfg.expenseItems.forEach(function(item){ expenseItems.push({ id: expenseSeq++, nome: item.nome || '', importo: item.importo || 0 }); });
+    }
+    syncToggleUI(); syncPareggiaUI();
+    CHANNELS.forEach(syncChannelUI);
+    syncSlider('entrate','entrateSlider');
+    syncSlider('speseSingle','speseSingleSlider');
+    renderExpenseRows();
+    recalc();
+  }
+
+  function loadJSON(key, fallback){ try{ var raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; }catch(e){ return fallback; } }
+  function saveJSON(key, obj){ try{ localStorage.setItem(key, JSON.stringify(obj)); return true; }catch(e){ return false; } }
+  function saveCurrent(){ saveJSON(CURRENT_KEY, currentConfig()); }
+
+  function refreshTemplateSelect(){
+    var sel = document.getElementById('templateSelect');
+    var templates = loadJSON(STORE_KEY, {});
+    var names = Object.keys(templates).sort();
+    sel.innerHTML = '<option value="">— seleziona un template salvato —</option>';
+    names.forEach(function(name){ var opt = document.createElement('option'); opt.value = name; opt.textContent = name; sel.appendChild(opt); });
+  }
+
+  function setStatus(msg){
+    var el = document.getElementById('statusMsg'); el.textContent = msg;
+    if(msg){ setTimeout(function(){ if(el.textContent === msg) el.textContent = ''; }, 3200); }
+  }
+
+  document.getElementById('saveTemplateBtn').addEventListener('click', function(){
+    var nameInput = document.getElementById('templateName');
+    var name = nameInput.value.trim();
+    if(!name){ setStatus('Assegna un nome al template prima di salvare.'); return; }
+    var templates = loadJSON(STORE_KEY, {});
+    templates[name] = currentConfig();
+    var ok = saveJSON(STORE_KEY, templates);
+    setStatus(ok ? 'Template "' + name + '" salvato.' : 'Salvataggio non riuscito: spazio browser pieno.');
+    refreshTemplateSelect(); document.getElementById('templateSelect').value = name; nameInput.value = '';
+  });
+  document.getElementById('loadTemplateBtn').addEventListener('click', function(){
+    var sel = document.getElementById('templateSelect'); var name = sel.value;
+    if(!name){ setStatus('Seleziona un template da caricare.'); return; }
+    var templates = loadJSON(STORE_KEY, {});
+    if(templates[name]){ applyConfig(templates[name]); setStatus('Template "' + name + '" caricato.'); }
+  });
+  document.getElementById('deleteTemplateBtn').addEventListener('click', function(){
+    var sel = document.getElementById('templateSelect'); var name = sel.value;
+    if(!name){ setStatus('Seleziona un template da eliminare.'); return; }
+    var templates = loadJSON(STORE_KEY, {}); delete templates[name]; saveJSON(STORE_KEY, templates);
+    refreshTemplateSelect(); setStatus('Template "' + name + '" eliminato.');
+  });
+
+  function syncToggleUI(){
+    var buttons = document.querySelectorAll('#speseToggle button');
+    buttons.forEach(function(b){ b.classList.toggle('active', b.dataset.mode === speseMode); });
+    document.getElementById('speseSingleWrap').style.display = speseMode === 'single' ? 'flex' : 'none';
+    document.getElementById('speseMultiWrap').style.display = speseMode === 'multi' ? 'block' : 'none';
+  }
+  document.querySelectorAll('#speseToggle button').forEach(function(btn){
+    btn.addEventListener('click', function(){ speseMode = btn.dataset.mode; syncToggleUI(); recalc(); saveCurrent(); });
+  });
+
+  function syncPareggiaUI(){
+    var buttons = document.querySelectorAll('#pareggiaToggle button');
+    buttons.forEach(function(b){ b.classList.toggle('active', b.dataset.val === (pareggia ? 'on' : 'off')); });
+    document.getElementById('quotaLabel').textContent = pareggia ? '÷ 3 canali (lordo pareggiato)' : '÷ ripartizione (netto pareggiato)';
+  }
+  document.querySelectorAll('#pareggiaToggle button').forEach(function(btn){
+    btn.addEventListener('click', function(){ pareggia = btn.dataset.val === 'on'; syncPareggiaUI(); recalc(); saveCurrent(); });
+  });
+
+  function syncChannelUI(key){
+    var regime = regimeSel[key].value;
+    var needsInarcassa = regime === 'ordinario' || regime === 'forfettario15' || regime === 'forfettario5';
+    document.getElementById(key+'_inarcassaRow').style.display = needsInarcassa ? 'flex' : 'none';
+    var t1 = document.getElementById(key+'_tax1label');
+    var t2 = document.getElementById(key+'_tax2label');
+    if(regime === 'dipendente'){ t1.textContent = '− Tassazione dipendente'; t2.textContent = '− INPS'; }
+    else if(regime === 'ordinario'){ t1.textContent = '− Regime ordinario'; t2.textContent = '− Inarcassa'; }
+    else if(regime === 'dividendo'){ t1.textContent = '− Imposta sostitutiva dividendi'; t2.textContent = '− Contributi previdenziali'; }
+    else { t1.textContent = '− Imposta sostitutiva'; t2.textContent = '− Inarcassa'; }
+    var toggleBtns = document.querySelectorAll('#'+key+'_inarcassaToggle button');
+    toggleBtns.forEach(function(b){ b.classList.toggle('active', b.dataset.val === (chState[key].inarcassaOn ? 'on' : 'off')); });
+  }
+  CHANNELS.forEach(function(key){
+    regimeSel[key].addEventListener('change', function(){ syncChannelUI(key); recalc(); saveCurrent(); });
+    document.querySelectorAll('#'+key+'_inarcassaToggle button').forEach(function(btn){
+      btn.addEventListener('click', function(){ chState[key].inarcassaOn = btn.dataset.val === 'on'; syncChannelUI(key); recalc(); saveCurrent(); });
+    });
+  });
+
+  function renderExpenseRows(){
+    var container = document.getElementById('expenseRows');
+    container.innerHTML = '';
+    expenseItems.forEach(function(item){
+      var row = document.createElement('div'); row.className = 'expense-row';
+      var nameInput = document.createElement('input');
+      nameInput.type = 'text'; nameInput.placeholder = 'nome voce (es. Affitto studio)'; nameInput.value = item.nome;
+      nameInput.addEventListener('input', function(){ item.nome = nameInput.value; saveCurrent(); });
+
+      var amtWrap = document.createElement('div'); amtWrap.className = 'exp-amt-wrap';
+      var amountInput = document.createElement('input');
+      amountInput.type = 'number'; amountInput.step = '10'; amountInput.value = item.importo;
+      var amountSlider = document.createElement('input');
+      amountSlider.type = 'range'; amountSlider.min = '0'; amountSlider.step = '100';
+      amountSlider.max = String(Math.max(50000, Math.ceil(item.importo * 1.5 / 1000) * 1000));
+      amountSlider.value = item.importo;
+
+      amountInput.addEventListener('input', function(){
+        item.importo = safeNum(amountInput.value);
+        if(item.importo > safeNum(amountSlider.max)) amountSlider.max = String(Math.ceil(item.importo * 1.2 / 100) * 100);
+        amountSlider.value = item.importo;
+        recalc(); saveCurrent();
+      });
+      amountSlider.addEventListener('input', function(){
+        amountInput.value = amountSlider.value; item.importo = safeNum(amountSlider.value);
+        recalc(); saveCurrent();
+      });
+
+      amtWrap.appendChild(amountInput); amtWrap.appendChild(amountSlider);
+
+      var removeBtn = document.createElement('button'); removeBtn.className = 'ghost'; removeBtn.textContent = '✕';
+      removeBtn.setAttribute('aria-label', 'Rimuovi voce di spesa');
+      removeBtn.addEventListener('click', function(){
+        expenseItems = expenseItems.filter(function(x){ return x.id !== item.id; });
+        renderExpenseRows(); recalc(); saveCurrent();
+      });
+
+      row.appendChild(nameInput); row.appendChild(amtWrap); row.appendChild(removeBtn);
+      container.appendChild(row);
+    });
+  }
+  document.getElementById('addExpenseBtn').addEventListener('click', function(){
+    expenseItems.push({ id: expenseSeq++, nome:'', importo:0 });
+    renderExpenseRows(); recalc(); saveCurrent();
+  });
+
+  function syncSlider(numId, sliderId){
+    var num = els[numId] || document.getElementById(numId);
+    var slider = document.getElementById(sliderId);
+    var v = safeNum(num.value);
+    if(v > safeNum(slider.max)) slider.max = String(Math.ceil(v * 1.2 / 1000) * 1000);
+    slider.value = v;
+  }
+  function attachSlider(numId, sliderId){
+    var num = els[numId]; var slider = document.getElementById(sliderId);
+    num.addEventListener('input', function(){ syncSlider(numId, sliderId); recalc(); saveCurrent(); });
+    slider.addEventListener('input', function(){ num.value = slider.value; recalc(); saveCurrent(); });
+  }
+  attachSlider('entrate','entrateSlider');
+  attachSlider('speseSingle','speseSingleSlider');
+
+  /* ---- tax engine: contributi previdenziali sempre dedotti dal reddito PRIMA dell'imposta, come da norma ---- */
+  function computeChannel(quota, regime, inarcassaOn){
+    var inarcassaFissaVal = safeNum(els.inarcassaFissa.value);
+    var ip = safeNum(els.inarcassaPct.value) / 100;
+
+    if(regime === 'dipendente'){
+      var inpsFissaVal = safeNum(els.inpsFissa.value);
+      var inpc = safeNum(els.inpsPct.value) / 100;
+      var impFissaVal = safeNum(els.impFissa.value);
+      var impc = safeNum(els.impPct.value) / 100;
+      var contrib = inpsFissaVal + quota * inpc;
+      var taxable = Math.max(0, quota - contrib);
+      var tax = impFissaVal + taxable * impc;
+      return { tax1: tax, tax2: contrib, net: quota - contrib - tax, base: quota, sogliaStatus: 'none' };
+    }
+    if(regime === 'ordinario'){
+      var ordFissaVal = safeNum(els.ordFissa.value);
+      var ordc = safeNum(els.ordPct.value) / 100;
+      var contribO = (inarcassaOn ? inarcassaFissaVal : 0) + quota * ip;
+      var taxableO = Math.max(0, quota - contribO);
+      var taxO = ordFissaVal + taxableO * ordc;
+      return { tax1: taxO, tax2: contribO, net: quota - contribO - taxO, base: quota, sogliaStatus: 'none' };
+    }
+    if(regime === 'dividendo'){
+      var al = safeNum(els.aliquotaDividendo.value) / 100;
+      var taxD = quota * al;
+      return { tax1: taxD, tax2: 0, net: quota - taxD, base: quota, sogliaStatus: 'none' };
+    }
+    // forfettario15 / forfettario5
+    var coeff = safeNum(els.coefficiente.value) / 100;
+    var aliquota = (regime === 'forfettario5' ? safeNum(els.aliquotaF5.value) : safeNum(els.aliquotaF15.value)) / 100;
+    var base = quota * coeff;
+    var contribF = (inarcassaOn ? inarcassaFissaVal : 0) + base * ip;
+    var taxableF = Math.max(0, base - contribF);
+    var taxF = taxableF * aliquota;
+    var soglia1 = safeNum(els.sogliaForfettario.value);
+    var soglia2 = safeNum(els.sogliaForfettarioUscita.value);
+    var status = 'none';
+    if(quota > soglia2) status = 'hard'; else if(quota > soglia1) status = 'soft';
+    return { tax1: taxF, tax2: contribF, net: quota - contribF - taxF, base: base, sogliaStatus: status };
+  }
+
+  function rfFor(regime, inarcassaOn){
+    var inarcassaFissaVal = safeNum(els.inarcassaFissa.value);
+    var ip = safeNum(els.inarcassaPct.value) / 100;
+    if(regime === 'dipendente'){
+      var inpc = safeNum(els.inpsPct.value) / 100;
+      var impc = safeNum(els.impPct.value) / 100;
+      var r = 1 - (1 - inpc) * (1 - impc);
+      var f = safeNum(els.inpsFissa.value) * (1 - impc) + safeNum(els.impFissa.value);
+      return { r: r, f: f };
+    }
+    if(regime === 'ordinario'){
+      var ordc = safeNum(els.ordPct.value) / 100;
+      var r2 = 1 - (1 - ip) * (1 - ordc);
+      var f2 = (inarcassaOn ? inarcassaFissaVal : 0) * (1 - ordc) + safeNum(els.ordFissa.value);
+      return { r: r2, f: f2 };
+    }
+    if(regime === 'dividendo'){
+      return { r: safeNum(els.aliquotaDividendo.value) / 100, f: 0 };
+    }
+    var coeff = safeNum(els.coefficiente.value) / 100;
+    var aliquota = (regime === 'forfettario5' ? safeNum(els.aliquotaF5.value) : safeNum(els.aliquotaF15.value)) / 100;
+    var r3 = coeff * (ip + aliquota * (1 - ip));
+    var f3 = (inarcassaOn ? inarcassaFissaVal : 0) * (1 - aliquota);
+    return { r: r3, f: f3 };
+  }
+
+  function equalize(utileNetto){
+    var rf = CHANNELS.map(function(k){ return rfFor(regimeSel[k].value, chState[k].inarcassaOn); });
+    for(var i=0;i<rf.length;i++){ if(rf[i].r >= 1) return null; }
+    var denom = rf.reduce(function(s,x){ return s + 1/(1-x.r); }, 0);
+    var numerator = utileNetto - rf.reduce(function(s,x){ return s + x.f/(1-x.r); }, 0);
+    var N = numerator/denom;
+    var quotas = rf.map(function(x){ return (N + x.f)/(1-x.r); });
+    return { N:N, quotas:quotas };
+  }
+
+  function updateSummaries(){
+    document.getElementById('sum-dipendente').textContent = safeNum(els.impPct.value)+'% + INPS '+safeNum(els.inpsPct.value)+'%';
+    document.getElementById('sum-forfettario').textContent = 'coeff '+safeNum(els.coefficiente.value)+'% · '+safeNum(els.aliquotaF15.value)+'%/'+safeNum(els.aliquotaF5.value)+'%';
+    document.getElementById('sum-ordinario').textContent = safeNum(els.ordPct.value)+'%';
+    document.getElementById('sum-inarcassa').textContent = fmt.format(safeNum(els.inarcassaFissa.value))+' + '+safeNum(els.inarcassaPct.value)+'%';
+    document.getElementById('sum-dividendo').textContent = safeNum(els.aliquotaDividendo.value)+'%';
+  }
+
+  function recalc(){
+    var entrate = safeNum(els.entrate.value);
+    var speseTotali;
+    if(speseMode === 'single'){ speseTotali = safeNum(els.speseSingle.value); }
+    else {
+      speseTotali = expenseItems.reduce(function(sum, item){ return sum + safeNum(item.importo); }, 0);
+      document.getElementById('speseMultiTotal').textContent = fmt.format(speseTotali);
+    }
+
+    var guadagnoLordo = entrate - speseTotali;
+    var iresPct = safeNum(els.ires.value); var irapPct = safeNum(els.irap.value);
+    var corpRate = (iresPct + irapPct) / 100;
+    var taxSocieta = guadagnoLordo * corpRate;
+    var utileNetto = guadagnoLordo - taxSocieta;
+
+    var quotas = {}; var warnMsg = '';
+    if(!pareggia){
+      var eq = equalize(utileNetto);
+      if(eq && eq.quotas.every(isFinite)){
+        CHANNELS.forEach(function(k,i){ quotas[k] = eq.quotas[i]; });
+        if(eq.quotas.some(function(q){ return q < 0; })){
+          warnMsg = 'Con queste aliquote il pareggiamento richiederebbe una quota negativa per un socio: non è realizzabile così com\'è. Prova ad avvicinare le aliquote tra i regimi scelti.';
+        }
+      } else {
+        CHANNELS.forEach(function(k){ quotas[k] = utileNetto/3; });
+        warnMsg = 'Con un\'aliquota totale pari o superiore al 100% il pareggiamento non è calcolabile: rivedi le percentuali di tassazione.';
+      }
+    } else {
+      CHANNELS.forEach(function(k){ quotas[k] = utileNetto/3; });
+    }
+    document.getElementById('pareggiaWarn').style.display = warnMsg ? 'block' : 'none';
+    document.getElementById('pareggiaWarn').textContent = warnMsg;
+
+    document.getElementById('r_entrate').textContent = fmt.format(entrate);
+    document.getElementById('r_spese').textContent = fmt.format(speseTotali);
+    document.getElementById('r_guadagnoLordo').textContent = fmt.format(guadagnoLordo);
+    document.getElementById('r_taxSocieta').textContent = fmt.format(taxSocieta);
+    document.getElementById('r_utileNetto').textContent = fmt.format(utileNetto);
+    document.getElementById('r_quota').textContent = fmt.format(utileNetto);
+
+    var results = {};
+    var SOGLIA_TEXT = {
+      soft: 'Tra 85.000€ e 100.000€: per legge resti in forfettario fino a fine anno, ma dal prossimo passi a regime ordinario.',
+      hard: 'Oltre 100.000€: per legge l\'uscita dal forfettario è immediata nello stesso anno, con IVA e tassazione ordinaria dalle fatture che superano la soglia.'
+    };
+    CHANNELS.forEach(function(k){
+      var regime = regimeSel[k].value;
+      var res = computeChannel(quotas[k], regime, chState[k].inarcassaOn);
+      results[k] = res;
+      document.getElementById(k+'_quota').textContent = fmt.format(quotas[k]);
+      document.getElementById(k+'_tax1').textContent = fmt.format(res.tax1);
+      document.getElementById(k+'_tax2').textContent = fmt.format(res.tax2);
+      document.getElementById(k+'_net').textContent = fmt.format(res.net);
+      var warnEl = document.getElementById(k+'_warn');
+      warnEl.className = 'channel-warn';
+      if(res.sogliaStatus === 'soft' || res.sogliaStatus === 'hard'){
+        warnEl.classList.add(res.sogliaStatus);
+        warnEl.textContent = SOGLIA_TEXT[res.sogliaStatus];
+        warnEl.style.display = 'block';
+      } else { warnEl.style.display = 'none'; }
+    });
+
+    /* ---- flag soglia sullo slider entrate: calcolo dinamico via derivata numerica, valido in entrambe le modalità ---- */
+    var markerSoft = document.getElementById('entrateSogliaMarkerSoft');
+    var markerHard = document.getElementById('entrateSogliaMarkerHard');
+    var forfChannels = CHANNELS.filter(function(k){ return regimeSel[k].value === 'forfettario15' || regimeSel[k].value === 'forfettario5'; });
+    var soglia1 = safeNum(els.sogliaForfettario.value);
+    var soglia2 = safeNum(els.sogliaForfettarioUscita.value);
+
+    function quotasAtEntrate(testEntrate){
+      var gl = testEntrate - speseTotali;
+      var ts = gl * corpRate;
+      var un = gl - ts;
+      if(!pareggia){
+        var eq = equalize(un);
+        if(eq && eq.quotas.every(isFinite)){
+          var out = {}; CHANNELS.forEach(function(k,i){ out[k] = eq.quotas[i]; }); return out;
+        }
+      }
+      var out2 = {}; CHANNELS.forEach(function(k){ out2[k] = un/3; }); return out2;
+    }
+
+    if(forfChannels.length && corpRate < 1 && soglia1 > 0){
+      var q0 = quotasAtEntrate(entrate);
+      var q1 = quotasAtEntrate(entrate + 1000);
+      var sliderMax = safeNum(document.getElementById('entrateSlider').max);
+      var thr1List = [], thr2List = [];
+      forfChannels.forEach(function(k){
+        var A = (q1[k] - q0[k]) / 1000;
+        if(A > 1e-9){
+          thr1List.push(entrate + (soglia1 - q0[k]) / A);
+          thr2List.push(entrate + (soglia2 - q0[k]) / A);
+        }
+      });
+      if(thr1List.length){
+        var thr1 = Math.min.apply(null, thr1List);
+        var thr2 = Math.min.apply(null, thr2List);
+        var pct1 = Math.min(100, Math.max(0, thr1/sliderMax*100));
+        var pct2 = Math.min(100, Math.max(0, thr2/sliderMax*100));
+        markerSoft.style.left = pct1 + '%'; markerSoft.style.display = 'block';
+        markerSoft.title = 'Stima: oltre ' + fmt.format(thr1) + ' di entrate (a spese e regimi invariati), la quota di un canale in forfettario supera 85.000€.';
+        markerHard.style.left = pct2 + '%'; markerHard.style.display = 'block';
+        markerHard.title = 'Stima: oltre ' + fmt.format(thr2) + ' di entrate (a spese e regimi invariati), la quota di un canale in forfettario supera 100.000€.';
+      } else { markerSoft.style.display = 'none'; markerHard.style.display = 'none'; }
+    } else {
+      markerSoft.style.display = 'none'; markerHard.style.display = 'none';
+    }
+
+    updateSummaries();
+    return { entrate:entrate, speseTotali:speseTotali, quotas:quotas, results:results, utileNetto:utileNetto };
+  }
+
+  Object.keys(els).forEach(function(id){ els[id].addEventListener('input', function(){ recalc(); saveCurrent(); }); });
+
+  /* ---- confronto scenari ---- */
+  function refreshScenTable(){
+    var scenarios = loadJSON(SCEN_KEY, []);
+    var tbody = document.getElementById('scenTableBody');
+    tbody.innerHTML = '';
+    document.getElementById('scenEmpty').style.display = scenarios.length ? 'none' : 'block';
+    scenarios.forEach(function(s){
+      var tr = document.createElement('tr');
+      var totalNet = s.results.mazz.net + s.results.pane.net + s.results.zi.net;
+      tr.innerHTML =
+        '<td class="name">' + s.name + '</td>' +
+        '<td>' + fmt.format(s.entrate) + '</td>' +
+        '<td>' + fmt.format(s.speseTotali) + '</td>' +
+        '<td>' + REGIME_LABEL[s.regimes.mazz] + '</td>' +
+        '<td>' + REGIME_LABEL[s.regimes.pane] + '</td>' +
+        '<td>' + REGIME_LABEL[s.regimes.zi] + '</td>' +
+        '<td>' + fmt.format(s.results.mazz.net) + '</td>' +
+        '<td>' + fmt.format(s.results.pane.net) + '</td>' +
+        '<td>' + fmt.format(s.results.zi.net) + '</td>' +
+        '<td>' + fmt.format(totalNet) + '</td>' +
+        '<td></td>';
+      var actionsTd = tr.lastElementChild;
+      var loadBtn = document.createElement('button'); loadBtn.className = 'ghost small'; loadBtn.textContent = 'CARICA';
+      loadBtn.addEventListener('click', function(){ applyConfig(s.config); setStatus('Scenario "' + s.name + '" caricato.'); });
+      var delBtn = document.createElement('button'); delBtn.className = 'ghost small'; delBtn.textContent = '✕';
+      delBtn.setAttribute('aria-label', 'Elimina scenario');
+      delBtn.addEventListener('click', function(){
+        var all = loadJSON(SCEN_KEY, []).filter(function(x){ return x.id !== s.id; });
+        saveJSON(SCEN_KEY, all); refreshScenTable();
+      });
+      actionsTd.appendChild(loadBtn); actionsTd.appendChild(delBtn);
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('saveScenarioBtn').addEventListener('click', function(){
+    var nameInput = document.getElementById('scenarioName');
+    var name = nameInput.value.trim();
+    if(!name){ setStatus('Assegna un nome allo scenario prima di congelarlo.'); return; }
+    var live = recalc();
+    var scenario = {
+      id: 'scn_' + Date.now() + '_' + Math.floor(Math.random()*1000),
+      name: name,
+      entrate: live.entrate, speseTotali: live.speseTotali,
+      regimes: { mazz: regimeSel.mazz.value, pane: regimeSel.pane.value, zi: regimeSel.zi.value },
+      results: { mazz: live.results.mazz, pane: live.results.pane, zi: live.results.zi },
+      config: currentConfig()
+    };
+    var scenarios = loadJSON(SCEN_KEY, []);
+    scenarios.push(scenario);
+    var ok = saveJSON(SCEN_KEY, scenarios);
+    setStatus(ok ? 'Scenario "' + name + '" congelato per il confronto.' : 'Salvataggio non riuscito: spazio browser pieno.');
+    nameInput.value = '';
+    refreshScenTable();
+  });
+
+  var stored = loadJSON(CURRENT_KEY, null);
+  if(stored){ applyConfig(stored); }
+  else { syncToggleUI(); syncPareggiaUI(); CHANNELS.forEach(syncChannelUI); renderExpenseRows(); recalc(); }
+  refreshTemplateSelect();
+  refreshScenTable();
+})();
+</script>
+</body>
+</html>
